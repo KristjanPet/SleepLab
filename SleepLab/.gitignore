@@ -1,0 +1,83 @@
+
+# ==========================================
+# SleepLab - .gitignore
+# STM32 / CMake / VS Code
+# ==========================================
+
+# Build directories
+build/
+build-*/
+cmake-build-*/
+out/
+Debug/
+Release/
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.d
+*.su
+*.gcda
+*.gcno
+*.gcov
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+Testing/
+.ninja_deps
+.ninja_log
+build.ninja
+
+# IDE and editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.code-workspace
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+*.orig
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*core*
+core
+core.*
+
+# Python cache (helper scripts)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs
+*.log
+
+# STM32 generated IDE metadata
+.settings/
+.mxproject
+
+# Local compiler wrappers
+cmake/host-tools/
+
+# VS Code local IntelliSense
+.vscode/c_cpp_properties.json
