@@ -1,18 +1,15 @@
-
 # ==========================================
 # SleepLab - .gitignore
-# STM32 / CMake / VS Code
+# STM32CubeMX / STM32 HAL / CMake / Ninja / VS Code
 # ==========================================
 
-# Build directories
-build/
-build-*/
-cmake-build-*/
-out/
-Debug/
-Release/
-
-# Compiled files
+# Build output and compiled firmware
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/Debug/
+/Release/
 *.o
 *.obj
 *.a
@@ -28,9 +25,10 @@ Release/
 *.gcno
 *.gcov
 
-# CMake generated files
+# Generated CMake / Ninja files
 CMakeFiles/
 CMakeCache.txt
+CMakeUserPresets.json
 cmake_install.cmake
 compile_commands.json
 Makefile
@@ -39,45 +37,53 @@ Testing/
 .ninja_log
 build.ninja
 
-# IDE and editor
+# Local IDE and editor settings
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
 !.vscode/launch.json
 !.vscode/tasks.json
+.vscode/c_cpp_properties.json
 .idea/
 *.code-workspace
 
-# Temporary files
+# STM32CubeMX / STM32CubeIDE local workspace metadata
+.metadata/
+.settings/
+.mxproject
+.project
+.cproject
+.externalToolBuilders/
+.stm32cubeide/
+
+# Local compiler wrappers (not portable across machines)
+cmake/host-tools/
+
+# Temporary, backup, and OS files
 *.swp
 *.swo
 *~
 *.tmp
 *.bak
 *.orig
-
-# OS generated files
+*.log
 .DS_Store
 Thumbs.db
-*core*
-core
-core.*
 
-# Python cache (helper scripts)
+# Crash dumps (do NOT use *core*: CMSIS needs core_cm4.h!)
+/core
+/core.*
+*.core
+
+# Python helper scripts: generated files only
 __pycache__/
 *.pyc
 .venv/
 venv/
 
-# Logs
-*.log
-
-# STM32 generated IDE metadata
-.settings/
-.mxproject
-
-# Local compiler wrappers
-cmake/host-tools/
-
-# VS Code local IntelliSense
-.vscode/c_cpp_properties.json
+# IMPORTANT: Keep the following files tracked:
+#   Drivers/CMSIS/ (including core_cm4.h)
+#   Drivers/STM32F4xx_HAL_Driver/
+#   Core/
+#   SleepLab.ioc
+#   CMakeLists.txt and CMakePresets.json
