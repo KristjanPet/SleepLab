@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include "sht3x.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
@@ -48,7 +49,7 @@ I2C_HandleTypeDef hi2c1;
 /* USER CODE BEGIN PV */
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
-static const uint8_t usb_message[] = "SleepLab is alive!\r\n";
+static uint8_t usb_tx_buffer[96];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,17 +107,37 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    static const uint8_t message[] = "SleepLab is alive!\r\n";
+    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED){
+        USBD_CDC_HandleTypeDef *cdc =
+            (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
 
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)
-    {
-        CDC_Transmit_FS(
-            (uint8_t *)message,
-            sizeof(message) - 1U
-        );
+        // Do not overwrite a buffer used by USB.
+        if (cdc != NULL && cdc->TxState == 0U)
+        {
+            float temperature;
+            float humidity;
+
+            if (SHT3X_Read(&hi2c1, &temperature, &humidity) == HAL_OK)
+            {
+                int len = snprintf(
+                    (char *)usb_tx_buffer,
+                    sizeof(usb_tx_buffer),
+                    "Temperature: %.2f C | Humidity: %.2f %%\r\n",
+                    temperature,
+                    humidity
+                );
+
+                if (len > 0 && (size_t)len < sizeof(usb_tx_buffer))
+                {
+                    (void)CDC_Transmit_FS(
+                        usb_tx_buffer,
+                        (uint16_t)len
+                    );
+                }
+            }
+        }
     }
 
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     HAL_Delay(1000);
     /* USER CODE END 3 */
   }
