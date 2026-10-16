@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "sht3x.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,8 +46,9 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-float temperature_c = 0.0f;
-float humidity_percent = 0.0f;
+extern USBD_HandleTypeDef hUsbDeviceFS;
+
+static const uint8_t usb_message[] = "SleepLab is alive!\r\n";
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,18 +106,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_StatusTypeDef status = SHT3X_Read(&hi2c1, &temperature_c, &humidity_percent);
+    static const uint8_t message[] = "SleepLab is alive!\r\n";
 
-    if (status == HAL_OK){
-      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-      HAL_Delay(100);
+    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)
+    {
+        CDC_Transmit_FS(
+            (uint8_t *)message,
+            sizeof(message) - 1U
+        );
     }
-    else{
-      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-      HAL_Delay(700);
-    }
+
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+    HAL_Delay(1000);
+    /* USER CODE END 3 */
   }
-  /* USER CODE END 3 */
 }
 
 /**
