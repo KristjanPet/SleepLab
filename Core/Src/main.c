@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "sht3x.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SHT31_ADDR (0x44 << 1) // address shifted left by 1 for HAL
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,7 +43,8 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-
+float temperature_c = 0.0f;
+float humidity_percent = 0.0f;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,7 +101,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_StatusTypeDef status = HAL_I2C_IsDeviceReady(&hi2c1, SHT31_ADDR, 3, 100);
+    HAL_StatusTypeDef status = SHT3X_Read(&hi2c1, &temperature_c, &humidity_percent);
 
     if (status == HAL_OK){
       HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
