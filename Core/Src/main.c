@@ -22,10 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
-#include "sht3x.h"
-#include "usb_device.h"
-#include "usbd_cdc_if.h"
+#include "app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,9 +44,7 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-extern USBD_HandleTypeDef hUsbDeviceFS;
 
-static uint8_t usb_tx_buffer[96];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,7 +92,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-
+  App_Init(&hi2c1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,40 +102,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED){
-        USBD_CDC_HandleTypeDef *cdc =
-            (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
-
-        // Do not overwrite a buffer used by USB.
-        if (cdc != NULL && cdc->TxState == 0U)
-        {
-            float temperature;
-            float humidity;
-
-            if (SHT3X_Read(&hi2c1, &temperature, &humidity) == HAL_OK)
-            {
-                int len = snprintf(
-                    (char *)usb_tx_buffer,
-                    sizeof(usb_tx_buffer),
-                    "Temperature: %.2f C | Humidity: %.2f %%\r\n",
-                    temperature,
-                    humidity
-                );
-
-                if (len > 0 && (size_t)len < sizeof(usb_tx_buffer))
-                {
-                    (void)CDC_Transmit_FS(
-                        usb_tx_buffer,
-                        (uint16_t)len
-                    );
-                }
-            }
-        }
-    }
-
-    HAL_Delay(1000);
-    /* USER CODE END 3 */
+    App_Update();
   }
+  /* USER CODE END 3 */
 }
 
 /**
