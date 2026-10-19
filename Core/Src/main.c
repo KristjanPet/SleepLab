@@ -92,6 +92,16 @@ int main(void)
   MX_I2C1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
+  
+  // Enable the Cortex-M trace hardware.
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+  // Reset the cycle counter.
+  DWT->CYCCNT = 0U;
+
+  // Start counting CPU cycles.
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
   App_Init(&hi2c1);
   /* USER CODE END 2 */
 
