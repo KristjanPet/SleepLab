@@ -27,6 +27,10 @@ static uint32_t last_request_ms;
 static uint32_t measurement_start_ms;
 static uint32_t last_led_ms;
 
+static uint32_t last_actual_request_ms = 0U;
+static uint32_t actual_interval_ms = 0U;
+static bool first_request = true;
+
 static SHT3X_Sample latest_sample;
 static SHT3X_Status latest_status;
 
@@ -51,21 +55,25 @@ static void App_UpdateSensor(uint32_t now)
     switch (state)
     {
         case APP_IDLE:
+            uint32_t elapsed = (uint32_t)(now - last_request_ms);
+            if (elapsed >= SAMPLE_PERIOD_MS){
+                uint32_t periods = elapsed / SAMPLE_PERIOD_MS;
+                last_request_ms += periods * SAMPLE_PERIOD_MS; //skip the late periods
 
-            if ((uint32_t)(now - last_request_ms)
-                >= SAMPLE_PERIOD_MS)
-            {
-                last_request_ms = now;
+                if (!first_request){
+                    actual_interval_ms = (uint32_t)(now - last_actual_request_ms);
+                }
+
+                last_actual_request_ms = now;
+                first_request = false;
 
                 latest_status = SHT3X_Start(sensor_i2c);
 
-                if (latest_status == SHT3X_OK)
-                {
+                if (latest_status == SHT3X_OK){
                     measurement_start_ms = HAL_GetTick();
                     state = APP_WAIT_MEASUREMENT;
                 }
-                else
-                {
+                else{
                     report_pending = true;
                 }
             }
@@ -113,9 +121,10 @@ static void App_UpdateUSB(void)
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),
-            "Temperature: %.2f C | Humidity: %.2f %%\r\n",
+            "T: %.2f C | RH: %.2f %% | Interval: %lu ms\r\n",
             latest_sample.temperature_c,
-            latest_sample.humidity_pct
+            latest_sample.humidity_pct,
+            (unsigned long)actual_interval_ms
         );
     }
     else
