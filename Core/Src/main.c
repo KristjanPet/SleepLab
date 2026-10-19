@@ -92,7 +92,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  
+
   // Enable the Cortex-M trace hardware.
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 
@@ -103,18 +103,61 @@ int main(void)
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
   App_Init(&hi2c1);
+
+  uint32_t window_start_ms = HAL_GetTick();
+  uint32_t window_start_cycles = DWT->CYCCNT;
+  uint32_t sleep_cycles = 0U;
   /* USER CODE END 2 */
 
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+/* USER CODE BEGIN WHILE */
+while (1){
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
     App_Update();
-  }
-  /* USER CODE END 3 */
+
+    // Do not execute an ISR during sleep measurement.
+    __disable_irq();
+    __DSB();
+
+    uint32_t sleep_start = DWT->CYCCNT;
+
+    __WFI();
+
+    uint32_t sleep_end = DWT->CYCCNT;
+
+    // Allow pending interrupts to execute.
+    __enable_irq();
+
+    sleep_cycles += (uint32_t)(sleep_end - sleep_start);
+
+    uint32_t now = HAL_GetTick();
+
+    if ((uint32_t)(now - window_start_ms) >= 1000U)
+    {
+        uint32_t total_cycles =
+            (uint32_t)(DWT->CYCCNT - window_start_cycles);
+
+        if (total_cycles > 0U && sleep_cycles <= total_cycles)
+        {
+            uint32_t active_cycles =
+                total_cycles - sleep_cycles;
+
+            uint32_t load =
+                (uint32_t)(((uint64_t)active_cycles * 1000U)
+                           / total_cycles);
+
+            App_SetCpuLoadPermille((uint16_t)load);
+        }
+
+        window_start_ms = now;
+        window_start_cycles = DWT->CYCCNT;
+        sleep_cycles = 0U;
+    }
+}
+/* USER CODE END 3 */
 }
 
 /**

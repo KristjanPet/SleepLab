@@ -34,6 +34,7 @@ static bool first_request = true;
 //DWT cycle counter for performance measurement
 static uint32_t max_sensor_cycles = 0U;
 static uint32_t max_usb_cycles = 0U;
+static uint16_t cpu_load_permille = 0U;
 
 static SHT3X_Sample latest_sample;
 static SHT3X_Status latest_status;
@@ -126,16 +127,12 @@ static void App_UpdateUSB(void)
             (char *)usb_buffer,
             sizeof(usb_buffer),
             "T: %.2f C | RH: %.2f %% | dt: %lu ms"
-            " | Sensor max: %lu us | USB max: %lu us\r\n",
+            " | CPU: %u.%u %%\r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
             (unsigned long)actual_interval_ms,
-            (unsigned long)(
-                max_sensor_cycles / (SystemCoreClock / 1000000U)
-            ),
-            (unsigned long)(
-                max_usb_cycles / (SystemCoreClock / 1000000U)
-            )
+            (unsigned int)(cpu_load_permille / 10U),
+            (unsigned int)(cpu_load_permille % 10U)
         );
     }
     else
@@ -195,4 +192,9 @@ void App_Update(void){
         last_led_ms = now;
         HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
     }
+}
+
+void App_SetCpuLoadPermille(uint16_t load)
+{
+    cpu_load_permille = load;
 }
