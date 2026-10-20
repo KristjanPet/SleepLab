@@ -71,7 +71,6 @@ cmake/host-tools/
 Thumbs.db
 
 # Crash dumps (do NOT use *core*: CMSIS needs core_cm4.h!)
-/core
 /core.*
 *.core
 
