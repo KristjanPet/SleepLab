@@ -111,6 +111,7 @@ int main(void)
   // uint32_t window_start_ms = HAL_GetTick();
   // uint32_t window_start_cycles = DWT->CYCCNT;
   // uint32_t sleep_cycles = 0U;
+  __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
 
   if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK){
       Error_Handler();
@@ -120,9 +121,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1){
-      /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-      /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
       App_Update();
       __WFI();
   }
@@ -227,9 +228,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 47;
+  htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 9999;
+  htim2.Init.Period = 479999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
