@@ -5,6 +5,5 @@
 
 void App_Init(I2C_HandleTypeDef *i2c);
 void App_Update(void);
-void App_SetCpuLoadPermille(uint16_t load);
 
 #endif
