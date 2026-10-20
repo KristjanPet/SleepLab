@@ -35,6 +35,8 @@ static bool first_request = true;
 static uint32_t max_sensor_cycles = 0U;
 static uint32_t max_usb_cycles = 0U;
 static uint16_t cpu_load_permille = 0U;
+extern volatile uint32_t tim2_max_response_us;
+extern volatile uint32_t tim2_irq_count;
 
 static SHT3X_Sample latest_sample;
 static SHT3X_Status latest_status;
@@ -121,22 +123,23 @@ static void App_UpdateUSB(void)
 
     int length;
 
-    if (latest_status == SHT3X_OK)
-    {
+    if (latest_status == SHT3X_OK){
+        uint32_t irq_response = tim2_max_response_us;
+        uint32_t irq_count = tim2_irq_count;
+
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),
             "T: %.2f C | RH: %.2f %% | dt: %lu ms"
-            " | CPU: %u.%u %%\r\n",
+            " | TIM2 max: %lu us | IRQs: %lu\r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
             (unsigned long)actual_interval_ms,
-            (unsigned int)(cpu_load_permille / 10U),
-            (unsigned int)(cpu_load_permille % 10U)
+            (unsigned long)irq_response,
+            (unsigned long)irq_count
         );
     }
-    else
-    {
+    else{
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),

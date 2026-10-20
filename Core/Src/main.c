@@ -43,6 +43,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim2;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -51,6 +53,7 @@ I2C_HandleTypeDef hi2c1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -91,73 +94,39 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USB_DEVICE_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  // Enable the Cortex-M trace hardware.
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  // // Enable the Cortex-M trace hardware.
+  // CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 
-  // Reset the cycle counter.
-  DWT->CYCCNT = 0U;
+  // // Reset the cycle counter.
+  // DWT->CYCCNT = 0U;
 
-  // Start counting CPU cycles.
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  // // Start counting CPU cycles.
+  // DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
   App_Init(&hi2c1);
 
-  uint32_t window_start_ms = HAL_GetTick();
-  uint32_t window_start_cycles = DWT->CYCCNT;
-  uint32_t sleep_cycles = 0U;
+  // uint32_t window_start_ms = HAL_GetTick();
+  // uint32_t window_start_cycles = DWT->CYCCNT;
+  // uint32_t sleep_cycles = 0U;
+
+  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK){
+      Error_Handler();
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
-/* USER CODE BEGIN WHILE */
-while (1){
-    /* USER CODE END WHILE */
+  /* USER CODE BEGIN WHILE */
+  while (1){
+      /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-
-    App_Update();
-
-    // Do not execute an ISR during sleep measurement.
-    __disable_irq();
-    __DSB();
-
-    uint32_t sleep_start = DWT->CYCCNT;
-
-    __WFI();
-
-    uint32_t sleep_end = DWT->CYCCNT;
-
-    // Allow pending interrupts to execute.
-    __enable_irq();
-
-    sleep_cycles += (uint32_t)(sleep_end - sleep_start);
-
-    uint32_t now = HAL_GetTick();
-
-    if ((uint32_t)(now - window_start_ms) >= 1000U)
-    {
-        uint32_t total_cycles =
-            (uint32_t)(DWT->CYCCNT - window_start_cycles);
-
-        if (total_cycles > 0U && sleep_cycles <= total_cycles)
-        {
-            uint32_t active_cycles =
-                total_cycles - sleep_cycles;
-
-            uint32_t load =
-                (uint32_t)(((uint64_t)active_cycles * 1000U)
-                           / total_cycles);
-
-            App_SetCpuLoadPermille((uint16_t)load);
-        }
-
-        window_start_ms = now;
-        window_start_cycles = DWT->CYCCNT;
-        sleep_cycles = 0U;
-    }
-}
-/* USER CODE END 3 */
+      /* USER CODE BEGIN 3 */
+      App_Update();
+      __WFI();
+  }
+  /* USER CODE END 3 */
 }
 
 /**
@@ -236,6 +205,51 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 47;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 9999;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
