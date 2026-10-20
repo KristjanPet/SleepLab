@@ -31,13 +31,6 @@ static uint32_t last_actual_request_ms = 0U;
 static uint32_t actual_interval_ms = 0U;
 static bool first_request = true;
 
-//DWT cycle counter for performance measurement
-static uint32_t max_sensor_cycles = 0U;
-static uint32_t max_usb_cycles = 0U;
-static uint16_t cpu_load_permille = 0U;
-extern volatile uint32_t tim2_max_response_ticks;
-extern volatile uint32_t tim2_irq_count;
-extern volatile uint32_t tim2_max_isr_cycles;
 
 static SHT3X_Sample latest_sample;
 static SHT3X_Status latest_status;
@@ -125,22 +118,13 @@ static void App_UpdateUSB(void)
     int length;
 
     if (latest_status == SHT3X_OK){
-        uint32_t irq_ticks = tim2_max_response_ticks;
-        uint32_t irq_count = tim2_irq_count;
-        uint32_t isr_cycles = tim2_max_isr_cycles;
 
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),
-            "T: %.2f C | RH: %.2f %% | dt: %lu ms"
-            " | IRQ max: %lu ticks | IRQs: %lu\r\n"
-            " | ISR max: %lu cycles",
+            "T: %.2f C | RH: %.2f %% \r\n",
             latest_sample.temperature_c,
-            latest_sample.humidity_pct,
-            (unsigned long)actual_interval_ms,
-            (unsigned long)irq_ticks,
-            (unsigned long)irq_count,
-            (unsigned long)isr_cycles
+            latest_sample.humidity_pct
         );
     }
     else{
@@ -169,29 +153,9 @@ static void App_UpdateUSB(void)
 void App_Update(void){
     uint32_t now = HAL_GetTick();
 
-    // Measure sensor task.
-    uint32_t start = DWT->CYCCNT;
-
     App_UpdateSensor(now);
 
-    uint32_t sensor_cycles = DWT->CYCCNT - start;
-
-    if (sensor_cycles > max_sensor_cycles)
-    {
-        max_sensor_cycles = sensor_cycles;
-    }
-
-    // Measure USB task.
-    start = DWT->CYCCNT;
-
     App_UpdateUSB();
-
-    uint32_t usb_cycles = DWT->CYCCNT - start;
-
-    if (usb_cycles > max_usb_cycles)
-    {
-        max_usb_cycles = usb_cycles;
-    }
 
     // Independent LED heartbeat.
     if ((uint32_t)(now - last_led_ms) >= LED_PERIOD_MS)
@@ -201,7 +165,3 @@ void App_Update(void){
     }
 }
 
-void App_SetCpuLoadPermille(uint16_t load)
-{
-    cpu_load_permille = load;
-}

@@ -97,20 +97,8 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  // // Enable the Cortex-M trace hardware.
-  // CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-
-  // // Reset the cycle counter.
-  // DWT->CYCCNT = 0U;
-
-  // // Start counting CPU cycles.
-  // DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-
   App_Init(&hi2c1);
 
-  // uint32_t window_start_ms = HAL_GetTick();
-  // uint32_t window_start_cycles = DWT->CYCCNT;
-  // uint32_t sleep_cycles = 0U;
   __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
 
   if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK){

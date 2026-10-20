@@ -42,10 +42,6 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 
-volatile uint32_t tim2_max_response_ticks = 0U;
-volatile uint32_t tim2_irq_count = 0U;
-volatile uint32_t tim2_max_isr_cycles = 0U;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -206,37 +202,15 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles TIM2 global interrupt.
   */
-void TIM2_IRQHandler(void){
-    /* USER CODE BEGIN TIM2_IRQn 0 */
+void TIM2_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM2_IRQn 0 */
 
-    uint32_t start_cycles = DWT->CYCCNT;
+  /* USER CODE END TIM2_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim2);
+  /* USER CODE BEGIN TIM2_IRQn 1 */
 
-    if ((TIM2->SR & TIM_SR_UIF) != 0U)
-    {
-        uint32_t response_ticks = TIM2->CNT;
-
-        if (response_ticks > tim2_max_response_ticks)
-        {
-            tim2_max_response_ticks = response_ticks;
-        }
-
-        tim2_irq_count++;
-    }
-
-    /* USER CODE END TIM2_IRQn 0 */
-
-    HAL_TIM_IRQHandler(&htim2);
-
-    /* USER CODE BEGIN TIM2_IRQn 1 */
-
-    uint32_t elapsed_cycles = DWT->CYCCNT - start_cycles;
-
-    if (elapsed_cycles > tim2_max_isr_cycles)
-    {
-        tim2_max_isr_cycles = elapsed_cycles;
-    }
-
-    /* USER CODE END TIM2_IRQn 1 */
+  /* USER CODE END TIM2_IRQn 1 */
 }
 
 /**
