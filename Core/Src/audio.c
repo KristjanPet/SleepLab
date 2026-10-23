@@ -13,6 +13,8 @@ static volatile uint32_t half_count = 0U;
 static volatile uint32_t full_count = 0U;
 static volatile uint32_t error_count = 0U;
 
+static volatile uint16_t debug_frame[4];
+
 HAL_StatusTypeDef Audio_Start(I2S_HandleTypeDef *hi2s)
 {
     audio_i2s = hi2s;
@@ -24,11 +26,17 @@ HAL_StatusTypeDef Audio_Start(I2S_HandleTypeDef *hi2s)
     );
 }
 
-void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
-{
+void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s){
     if (hi2s == audio_i2s)
     {
         half_count++;
+
+        // DMA is now filling the second half.
+        // The first half is safe to read.
+        for (uint32_t i = 0; i < 4U; i++)
+        {
+            debug_frame[i] = audio_buffer[i];
+        }
     }
 }
 
@@ -55,6 +63,10 @@ AudioStats Audio_GetStats(void)
     stats.half_count = half_count;
     stats.full_count = full_count;
     stats.error_count = error_count;
+
+    for (uint32_t i = 0; i < 4U; i++){
+        stats.raw_frame[i] = debug_frame[i];
+    }
 
     return stats;
 }
