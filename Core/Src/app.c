@@ -3,6 +3,7 @@
 #include "sht3x.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "audio.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -118,13 +119,18 @@ static void App_UpdateUSB(void)
     int length;
 
     if (latest_status == SHT3X_OK){
+        AudioStats audio = Audio_GetStats();
 
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),
-            "T: %.2f C | RH: %.2f %% \r\n",
+            "T: %.2f C | RH: %.2f %%"
+            " | DMA H:%lu F:%lu E:%lu\r\n",
             latest_sample.temperature_c,
-            latest_sample.humidity_pct
+            latest_sample.humidity_pct,
+            (unsigned long)audio.half_count,
+            (unsigned long)audio.full_count,
+            (unsigned long)audio.error_count
         );
     }
     else{

@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app.h"
+#include "audio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,6 +102,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   App_Init(&hi2c1);
+  
+  if (Audio_Start(&hi2s2) != HAL_OK){
+      Error_Handler();
+  }
 
   /* USER CODE END 2 */
 

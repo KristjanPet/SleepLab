@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/sht3x.c
     Core/Src/app.c
+    Core/Src/audio.c
 )
 
 # Add include paths
