@@ -127,6 +127,7 @@ static void App_UpdateUSB(void)
             "T: %.2f | RH: %.2f"
             " | H:%lu F:%lu E:%lu"
             " | L:%04X %04X R:%04X %04X"
+            " | Miss:%lu"
             " | Audio:%lu \r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
@@ -137,6 +138,7 @@ static void App_UpdateUSB(void)
             (unsigned int)audio.raw_frame[1],
             (unsigned int)audio.raw_frame[2],
             (unsigned int)audio.raw_frame[3],
+            (unsigned long)audio.missed_blocks,
             (unsigned long)audio.average_amplitude
         );
     }

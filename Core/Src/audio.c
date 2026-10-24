@@ -14,6 +14,7 @@ static volatile uint32_t full_count = 0U;
 static volatile uint32_t error_count = 0U;
 
 static volatile uint8_t ready_half = 0U;
+static volatile uint32_t missed_blocks = 0U;
 
 static uint64_t amplitude_sum = 0U;
 static uint32_t amplitude_samples = 0U;
@@ -52,6 +53,9 @@ void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s){
     if (hi2s == audio_i2s)
     {
         half_count++;
+        if (ready_half != 0U){
+            missed_blocks++;
+        }
         ready_half = 1U;
 
         // DMA is now filling the second half.
@@ -68,6 +72,9 @@ void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s)
     if (hi2s == audio_i2s)
     {
         full_count++;
+        if (ready_half != 0U){
+            missed_blocks++;
+        }
         ready_half = 2U;
     }
 }
@@ -87,6 +94,7 @@ AudioStats Audio_GetStats(void)
     stats.half_count = half_count;
     stats.full_count = full_count;
     stats.error_count = error_count;
+    stats.missed_blocks = missed_blocks;
 
     for (uint32_t i = 0; i < 4U; i++){
         stats.raw_frame[i] = debug_frame[i];
