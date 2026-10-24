@@ -126,7 +126,8 @@ static void App_UpdateUSB(void)
             sizeof(usb_buffer),
             "T: %.2f | RH: %.2f"
             " | H:%lu F:%lu E:%lu"
-            " | L:%04X %04X R:%04X %04X\r\n",
+            " | L:%04X %04X R:%04X %04X"
+            " | Audio:%lu \r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
             (unsigned long)audio.half_count,
@@ -135,7 +136,8 @@ static void App_UpdateUSB(void)
             (unsigned int)audio.raw_frame[0],
             (unsigned int)audio.raw_frame[1],
             (unsigned int)audio.raw_frame[2],
-            (unsigned int)audio.raw_frame[3]
+            (unsigned int)audio.raw_frame[3],
+            (unsigned long)audio.average_amplitude
         );
     }
     else{

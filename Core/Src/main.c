@@ -102,7 +102,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   App_Init(&hi2c1);
-  
+
   if (Audio_Start(&hi2s2) != HAL_OK){
       Error_Handler();
   }
@@ -115,6 +115,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+      Audio_Process();
       App_Update();
       __WFI();
   }
