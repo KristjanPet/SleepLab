@@ -98,79 +98,78 @@ static void App_UpdateSensor(uint32_t now)
     }
 }
 
-static void App_UpdateUSB(void)
-{
-    if (!report_pending ||
-        hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ||
-        hUsbDeviceFS.pClassData == NULL)
-    {
-        return;
-    }
+// static void App_UpdateUSB(void){
+//     if (!report_pending ||
+//         hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ||
+//         hUsbDeviceFS.pClassData == NULL)
+//     {
+//         return;
+//     }
 
-    USBD_CDC_HandleTypeDef *cdc =
-        (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+//     USBD_CDC_HandleTypeDef *cdc =
+//         (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
 
-    // The previous transfer must be complete.
-    if (cdc->TxState != 0U)
-    {
-        return;
-    }
+//     // The previous transfer must be complete.
+//     if (cdc->TxState != 0U)
+//     {
+//         return;
+//     }
 
-    int length;
+//     int length;
 
-    if (latest_status == SHT3X_OK){
-        AudioStats audio = Audio_GetStats();
+//     if (latest_status == SHT3X_OK){
+//         AudioStats audio = Audio_GetStats();
 
-        length = snprintf(
-            (char *)usb_buffer,
-            sizeof(usb_buffer),
-            "T: %.2f | RH: %.2f"
-            " | H:%lu F:%lu E:%lu"
-            " | L:%04X %04X R:%04X %04X"
-            " | Miss:%lu"
-            " | Audio:%lu \r\n",
-            latest_sample.temperature_c,
-            latest_sample.humidity_pct,
-            (unsigned long)audio.half_count,
-            (unsigned long)audio.full_count,
-            (unsigned long)audio.error_count,
-            (unsigned int)audio.raw_frame[0],
-            (unsigned int)audio.raw_frame[1],
-            (unsigned int)audio.raw_frame[2],
-            (unsigned int)audio.raw_frame[3],
-            (unsigned long)audio.missed_blocks,
-            (unsigned long)audio.average_amplitude
-        );
-    }
-    else{
-        length = snprintf(
-            (char *)usb_buffer,
-            sizeof(usb_buffer),
-            "SHT3x error: %d\r\n",
-            (int)latest_status
-        );
-    }
+//         length = snprintf(
+//             (char *)usb_buffer,
+//             sizeof(usb_buffer),
+//             "T: %.2f | RH: %.2f"
+//             " | H:%lu F:%lu E:%lu"
+//             " | L:%04X %04X R:%04X %04X"
+//             " | Miss:%lu"
+//             " | Audio:%lu \r\n",
+//             latest_sample.temperature_c,
+//             latest_sample.humidity_pct,
+//             (unsigned long)audio.half_count,
+//             (unsigned long)audio.full_count,
+//             (unsigned long)audio.error_count,
+//             (unsigned int)audio.raw_frame[0],
+//             (unsigned int)audio.raw_frame[1],
+//             (unsigned int)audio.raw_frame[2],
+//             (unsigned int)audio.raw_frame[3],
+//             (unsigned long)audio.missed_blocks,
+//             (unsigned long)audio.average_amplitude
+//         );
+//     }
+//     else{
+//         length = snprintf(
+//             (char *)usb_buffer,
+//             sizeof(usb_buffer),
+//             "SHT3x error: %d\r\n",
+//             (int)latest_status
+//         );
+//     }
 
-    if (length <= 0 ||
-        (size_t)length >= sizeof(usb_buffer))
-    {
-        return;
-    }
+//     if (length <= 0 ||
+//         (size_t)length >= sizeof(usb_buffer))
+//     {
+//         return;
+//     }
 
-    if (CDC_Transmit_FS(
-            usb_buffer,
-            (uint16_t)length) == USBD_OK)
-    {
-        report_pending = false;
-    }
-}
+//     if (CDC_Transmit_FS(
+//             usb_buffer,
+//             (uint16_t)length) == USBD_OK)
+//     {
+//         report_pending = false;
+//     }
+// }
 
 void App_Update(void){
     uint32_t now = HAL_GetTick();
 
     App_UpdateSensor(now);
 
-    App_UpdateUSB();
+    // App_UpdateUSB();
 
     // Independent LED heartbeat.
     if ((uint32_t)(now - last_led_ms) >= LED_PERIOD_MS)

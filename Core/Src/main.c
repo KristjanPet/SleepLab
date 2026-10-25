@@ -115,7 +115,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-      Audio_Process();
+      Audio_Poll();
       App_Update();
       __WFI();
   }
