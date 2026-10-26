@@ -124,22 +124,19 @@ static void App_UpdateUSB(void)
         length = snprintf(
             (char *)usb_buffer,
             sizeof(usb_buffer),
-            "T: %.2f | RH: %.2f"
+            "T:%.2f RH:%.2f"
             " | H:%lu F:%lu E:%lu"
-            " | L:%04X %04X R:%04X %04X"
-            " | Miss:%lu"
-            " | Audio:%lu \r\n",
+            " | Miss:%lu N:%lu"
+            " | RMS:%.5f dBFS:%.1f\r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
             (unsigned long)audio.half_count,
             (unsigned long)audio.full_count,
             (unsigned long)audio.error_count,
-            (unsigned int)audio.raw_frame[0],
-            (unsigned int)audio.raw_frame[1],
-            (unsigned int)audio.raw_frame[2],
-            (unsigned int)audio.raw_frame[3],
             (unsigned long)audio.missed_blocks,
-            (unsigned long)audio.average_amplitude
+            (unsigned long)audio.processed_samples,
+            audio.rms,
+            audio.dbfs
         );
     }
     else{

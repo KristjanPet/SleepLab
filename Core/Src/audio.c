@@ -1,5 +1,7 @@
 #include "audio.h"
 
+#include <math.h>
+
 #define AUDIO_FRAMES_PER_HALF 256U
 #define I2S_WORDS_PER_FRAME   4U
 #define AUDIO_BUFFER_WORDS \
@@ -16,8 +18,9 @@ static volatile uint32_t error_count = 0U;
 static volatile uint8_t ready_half = 0U;
 static volatile uint32_t missed_blocks = 0U;
 
-static uint64_t amplitude_sum = 0U;
-static uint32_t amplitude_samples = 0U;
+static float sample_sum = 0.0f;
+static float sample_square_sum = 0.0f;
+static uint32_t sample_count = 0U;
 
 static volatile uint16_t debug_frame[4];
 
@@ -87,8 +90,7 @@ void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
     }
 }
 
-AudioStats Audio_GetStats(void)
-{
+AudioStats Audio_GetStats(void){
     AudioStats stats;
 
     stats.half_count = half_count;
@@ -100,13 +102,35 @@ AudioStats Audio_GetStats(void)
         stats.raw_frame[i] = debug_frame[i];
     }
 
-    stats.average_amplitude = (amplitude_samples > 0U)
-    ? (uint32_t)(amplitude_sum / amplitude_samples)
-    : 0U;
+    stats.processed_samples = sample_count;
+    stats.rms = 0.0f;
+    stats.dbfs = -120.0f; // Display floor when effectively silent.
+
+    if (sample_count > 0U)
+    {
+        float n = (float)sample_count;
+
+        float mean = sample_sum / n;
+        float mean_square = sample_square_sum / n;
+
+        // Remove the DC component from the signal power.
+        float ac_power = mean_square - (mean * mean);
+
+        if (ac_power > 0.0f)
+        {
+            stats.rms = sqrtf(ac_power);
+
+            if (stats.rms >= 0.000001f)
+            {
+                stats.dbfs = 20.0f * log10f(stats.rms);
+            }
+        }
+    }
 
     // Start a new measurement window.
-    amplitude_sum = 0U;
-    amplitude_samples = 0U;
+    sample_sum = 0.0f;
+    sample_square_sum = 0.0f;
+    sample_count = 0U;
 
     return stats;
 }
@@ -139,13 +163,13 @@ void Audio_Process(void){
             audio_buffer[i + 1U]
         );
 
-        // Absolute value of the sample.
-        uint32_t amplitude = (sample < 0)
-            ? (uint32_t)(-sample)
-            : (uint32_t)sample;
+        // RMS calculation
+        // Normalize signed 24-bit audio to approximately -1.0 to +1.0.
+        float x = (float)sample / 8388608.0f;
 
-        amplitude_sum += amplitude;
-        amplitude_samples++;
+        sample_sum += x;
+        sample_square_sum += x * x;
+        sample_count++;
     }
 }
 

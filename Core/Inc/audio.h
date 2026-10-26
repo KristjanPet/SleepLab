@@ -9,7 +9,11 @@ typedef struct
     uint32_t full_count;
     uint32_t error_count;
     uint32_t missed_blocks;
-    uint32_t average_amplitude;
+    
+    float rms;
+    float dbfs;
+    uint32_t processed_samples;
+
     uint16_t raw_frame[4];
 } AudioStats;
 
