@@ -6,6 +6,8 @@
 #define I2S_WORDS_PER_FRAME   4U
 #define AUDIO_BUFFER_WORDS \
     (2U * AUDIO_FRAMES_PER_HALF * I2S_WORDS_PER_FRAME)
+#define AUDIO_CAL_OFFSET_DB 110.05f
+#define AUDIO_EMA_TIME_S     1.0f
 
 static uint16_t audio_buffer[AUDIO_BUFFER_WORDS];
 
@@ -21,6 +23,10 @@ static volatile uint32_t missed_blocks = 0U;
 static float sample_sum = 0.0f;
 static float sample_square_sum = 0.0f;
 static uint32_t sample_count = 0U;
+
+static float ema_power = 0.0f;
+static uint32_t ema_last_ms = 0U;
+static uint8_t ema_initialized = 0U;
 
 static volatile uint16_t debug_frame[4];
 
@@ -106,8 +112,7 @@ AudioStats Audio_GetStats(void){
     stats.rms = 0.0f;
     stats.dbfs = -120.0f; // Display floor when effectively silent.
 
-    if (sample_count > 0U)
-    {
+    if (sample_count > 0U){
         float n = (float)sample_count;
 
         float mean = sample_sum / n;
@@ -116,15 +121,38 @@ AudioStats Audio_GetStats(void){
         // Remove the DC component from the signal power.
         float ac_power = mean_square - (mean * mean);
 
-        if (ac_power > 0.0f)
-        {
+        if (ac_power > 0.0f){
             stats.rms = sqrtf(ac_power);
 
-            if (stats.rms >= 0.000001f)
-            {
+            if (stats.rms >= 0.000001f){
                 stats.dbfs = 20.0f * log10f(stats.rms);
             }
         }
+    }
+
+    stats.estimated_level_db = 0.0f;
+
+    if (stats.processed_samples > 0U && stats.rms > 0.0f){
+        uint32_t now = HAL_GetTick();
+        float power = stats.rms * stats.rms;
+
+        if (!ema_initialized){
+            ema_power = power;
+            ema_initialized = 1U;
+        } 
+        else{
+            float dt = (float)(uint32_t)(now - ema_last_ms) / 1000.0f;
+
+            // Calculate alpha from the actual elapsed time.
+            float alpha = 1.0f - expf(-dt / AUDIO_EMA_TIME_S);
+
+            ema_power += alpha * (power - ema_power);
+        }
+
+        ema_last_ms = now;
+
+        stats.estimated_level_db =
+            10.0f * log10f(ema_power) + AUDIO_CAL_OFFSET_DB;
     }
 
     // Start a new measurement window.

@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define SAMPLE_PERIOD_MS  1000U
+#define SAMPLE_PERIOD_MS  500U //TODO temp
 #define CONVERSION_MS     20U
 #define LED_PERIOD_MS     500U
 
@@ -127,7 +127,7 @@ static void App_UpdateUSB(void)
             "T:%.2f RH:%.2f"
             " | H:%lu F:%lu E:%lu"
             " | Miss:%lu N:%lu"
-            " | RMS:%.5f dBFS:%.1f\r\n",
+            " | RMS:%.5f dBFS:%.1f Est:%.1f\r\n",
             latest_sample.temperature_c,
             latest_sample.humidity_pct,
             (unsigned long)audio.half_count,
@@ -136,7 +136,8 @@ static void App_UpdateUSB(void)
             (unsigned long)audio.missed_blocks,
             (unsigned long)audio.processed_samples,
             audio.rms,
-            audio.dbfs
+            audio.dbfs,
+            audio.estimated_level_db
         );
     }
     else{
