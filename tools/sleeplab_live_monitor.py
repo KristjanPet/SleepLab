@@ -2,7 +2,8 @@
 """SleepLab live USB CDC telemetry monitor.
 
 Reads the existing *text* telemetry firmware, not binary WAV test firmware.
-Graphs live readings and records timestamped telemetry to CSV.
+Graphs live readings (including optional calibrated estimates) and records
+timestamped telemetry to CSV. The estimated level is phone-referenced, not dBA.
 
 Install: py -m pip install pyserial matplotlib
 Run:     py sleeplab_live_monitor.py
@@ -43,7 +44,7 @@ GREEN = "#5bdbad"
 YELLOW = "#ffc777"
 GRID = "#354357"
 
-FLOAT_FIELDS = ("T", "RH", "RMS", "dBFS")
+FLOAT_FIELDS = ("T", "RH", "RMS", "dBFS", "Est")
 INT_FIELDS = ("H", "F", "E", "Miss", "N")
 FIELDS = FLOAT_FIELDS + INT_FIELDS
 VALUE_RE = {
@@ -53,7 +54,7 @@ VALUE_RE = {
 CSV_FIELDS = [
     "timestamp_local", "elapsed_s", "temperature_c", "humidity_pct",
     "dma_half", "dma_full", "dma_errors", "missed_blocks",
-    "processed_samples", "rms", "dbfs", "raw_line"
+    "processed_samples", "rms", "dbfs", "estimated_level_db", "raw_line"
 ]
 WINDOWS = {
     "30 seconds": 30,
@@ -65,7 +66,7 @@ WINDOWS = {
     "3 hours": 10800,
     "All stored": None,
 }
-GRAPH_OPTIONS = ["Overview", "Sound (dBFS)", "RMS", "Temperature", "Humidity", "Processed samples"]
+GRAPH_OPTIONS = ["Overview", "Estimated level (dB)", "Sound (dBFS)", "RMS", "Temperature", "Humidity", "Processed samples"]
 
 
 def parse_telemetry(line: str) -> dict | None:
@@ -121,7 +122,7 @@ class SleepLabGUI:
         self.conn_var = tk.StringVar(value="Disconnected")
         self.rec_var = tk.StringVar(value="Not recording")
         self.stat_vars = {key: tk.StringVar(value="—") for key in
-                          ("dbfs", "rms", "temp", "humidity", "n", "miss", "errors")}
+                          ("est", "dbfs", "rms", "temp", "humidity", "n", "miss", "errors")}
         self._make_ui()
         self._refresh_ports()
         self._plot()
@@ -187,29 +188,37 @@ class SleepLabGUI:
         self.stop_btn.pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(rec, text="Clear graph", command=self._clear).pack(side=tk.LEFT)
 
-        stat_row = ttk.Frame(outer)
-        stat_row.pack(fill=tk.X, pady=(3, 10))
-        metrics = [
-            ("dbfs", "SOUND (dBFS)", "dBFS"),
-            ("rms", "RMS", ""),
-            ("temp", "TEMPERATURE", "°C"),
-            ("humidity", "HUMIDITY", "%"),
-            ("n", "SAMPLES / REPORT", ""),
-            ("miss", "MISSED BLOCKS", ""),
-            ("errors", "DMA ERRORS", ""),
+        # Two compact metric rows keep the values readable on smaller screens.
+        stat_groups = [
+            [
+                ("est", "ESTIMATED SOUND", "dB"),
+                ("dbfs", "DIGITAL SOUND", "dBFS"),
+                ("rms", "RMS", ""),
+                ("temp", "TEMPERATURE", "°C"),
+            ],
+            [
+                ("humidity", "HUMIDITY", "%"),
+                ("n", "SAMPLES / REPORT", ""),
+                ("miss", "MISSED BLOCKS", ""),
+                ("errors", "DMA ERRORS", ""),
+            ],
         ]
-        for key, label, suffix in metrics:
-            box = tk.Frame(stat_row, bg=PANEL, padx=10, pady=8)
-            box.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 7))
-            tk.Label(box, text=label, fg=MUTED, bg=PANEL,
-                     font=("Segoe UI", 8)).pack(anchor="w")
-            line = tk.Frame(box, bg=PANEL)
-            line.pack(anchor="w")
-            tk.Label(line, textvariable=self.stat_vars[key], fg=GREEN if key == "dbfs" else FG,
-                     bg=PANEL, font=("Segoe UI", 15, "bold")).pack(side=tk.LEFT)
-            if suffix:
-                tk.Label(line, text=" " + suffix, fg=MUTED, bg=PANEL,
-                         font=("Segoe UI", 9)).pack(side=tk.LEFT, anchor="s")
+        for metrics in stat_groups:
+            stat_row = ttk.Frame(outer)
+            stat_row.pack(fill=tk.X, pady=(0, 6))
+            for key, label, suffix in metrics:
+                box = tk.Frame(stat_row, bg=PANEL, padx=10, pady=6)
+                box.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 7))
+                tk.Label(box, text=label, fg=MUTED, bg=PANEL,
+                         font=("Segoe UI", 8)).pack(anchor="w")
+                line = tk.Frame(box, bg=PANEL)
+                line.pack(anchor="w")
+                tk.Label(line, textvariable=self.stat_vars[key],
+                         fg=GREEN if key == "est" else FG,
+                         bg=PANEL, font=("Segoe UI", 15, "bold")).pack(side=tk.LEFT)
+                if suffix:
+                    tk.Label(line, text=" " + suffix, fg=MUTED, bg=PANEL,
+                             font=("Segoe UI", 9)).pack(side=tk.LEFT, anchor="s")
 
         fig_frame = ttk.Frame(outer)
         fig_frame.pack(fill=tk.BOTH, expand=True)
@@ -223,7 +232,8 @@ class SleepLabGUI:
         ttk.Label(lower, textvariable=self.conn_var, style="Secondary.TLabel").pack(side=tk.LEFT)
         ttk.Label(lower, textvariable=self.rec_var, style="Secondary.TLabel").pack(side=tk.RIGHT)
         ttk.Label(outer, text="Records numeric USB text measurements to CSV (not raw audio/WAV). "
-                  "Timestamps come from the PC.", style="Secondary.TLabel").pack(anchor="w", pady=(5, 0))
+                  "Estimated sound is phone-referenced (not calibrated dBA). PC timestamps.",
+                  style="Secondary.TLabel").pack(anchor="w", pady=(5, 0))
 
     def _refresh_ports(self):
         ports = [port.device for port in list_ports.comports()]
@@ -253,6 +263,8 @@ class SleepLabGUI:
         self.conn_var.set(f"Connected to {port_name} · waiting for telemetry…")
         self.connect_btn.configure(text="Disconnect")
         self.start_btn.configure(state="normal")
+        for var in self.stat_vars.values():
+            var.set("—")
         self.port_box.configure(state="disabled")
         threading.Thread(target=self._reader, args=(port, self.stop_reader), daemon=True).start()
 
@@ -373,6 +385,7 @@ class SleepLabGUI:
         self.last_measurement_at = received_mono
         self.conn_var.set(f"Connected to {self.port_var.get()} · {len(self.history)} readings stored")
         names = {
+            "est": ("Est", "{:.1f}"),
             "dbfs": ("dBFS", "{:.1f}"), "rms": ("RMS", "{:.5f}"),
             "temp": ("T", "{:.2f}"), "humidity": ("RH", "{:.2f}"),
             "n": ("N", "{:d}"), "miss": ("Miss", "{:d}"),
@@ -381,6 +394,8 @@ class SleepLabGUI:
         for label, (field, fmt) in names.items():
             if field in reading:
                 self.stat_vars[label].set(fmt.format(reading[field]))
+        if "Est" not in reading:
+            self.stat_vars["est"].set("—")  # Old firmware has no estimate.
         self.dirty = True
 
         if self.rec_state != "recording" or self.rec_writer is None:
@@ -401,6 +416,7 @@ class SleepLabGUI:
             "processed_samples": reading.get("N", ""),
             "rms": reading.get("RMS", ""),
             "dbfs": reading.get("dBFS", ""),
+            "estimated_level_db": reading.get("Est", ""),
             "raw_line": line,
         }
         try:
@@ -464,13 +480,25 @@ class SleepLabGUI:
     def _plot(self):
         self.figure.clear()
         option = self.graph_var.get()
+        selected_window = WINDOWS.get(self.window_var.get(), 300)
+        now = time.monotonic()
+        cutoff = -float("inf") if selected_window is None else now - selected_window
+        visible = [r for r in self.history if r["mono"] >= cutoff]
+
         if option == "Overview":
-            specs = [("dBFS", "Sound level (dBFS)", BLUE),
-                     ("T", "Temperature (°C)", GREEN),
-                     ("RH", "Relative humidity (%)", YELLOW)]
+            specs = []
+            # Keep the Overview useful with the old firmware too.
+            if any("Est" in r for r in visible):
+                specs.append(("Est", "Estimated sound (dB)", GREEN))
+            specs.extend([
+                ("dBFS", "Digital sound (dBFS)", BLUE),
+                ("T", "Temperature (°C)", GREEN),
+                ("RH", "Relative humidity (%)", YELLOW),
+            ])
         else:
             options = {
-                "Sound (dBFS)": ("dBFS", "Sound level (dBFS)", BLUE),
+                "Estimated level (dB)": ("Est", "Estimated sound (dB, not dBA)", GREEN),
+                "Sound (dBFS)": ("dBFS", "Digital sound (dBFS)", BLUE),
                 "RMS": ("RMS", "Normalized RMS", BLUE),
                 "Temperature": ("T", "Temperature (°C)", GREEN),
                 "Humidity": ("RH", "Relative humidity (%)", YELLOW),
@@ -478,10 +506,6 @@ class SleepLabGUI:
             }
             specs = [options.get(option, options["Sound (dBFS)"])]
 
-        selected_window = WINDOWS.get(self.window_var.get(), 300)
-        now = time.monotonic()
-        cutoff = -float("inf") if selected_window is None else now - selected_window
-        visible = [r for r in self.history if r["mono"] >= cutoff]
         if len(visible) > 3500:
             step = max(1, len(visible) // 3500)
             visible = visible[::step]
