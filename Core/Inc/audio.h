@@ -13,8 +13,6 @@ typedef struct{
     float dbfs;
     float estimated_level_db; 
     uint32_t processed_samples;
-
-    uint16_t raw_frame[4];
 } AudioStats;
 
 HAL_StatusTypeDef Audio_Start(I2S_HandleTypeDef *hi2s);
