@@ -1,0 +1,223 @@
+#include "audio.h"
+
+#include <math.h>
+
+#define AUDIO_FRAMES_PER_HALF 256U
+#define I2S_WORDS_PER_FRAME   4U
+#define AUDIO_BUFFER_WORDS \
+    (2U * AUDIO_FRAMES_PER_HALF * I2S_WORDS_PER_FRAME)
+#define AUDIO_CAL_OFFSET_DB 110.05f
+#define AUDIO_EMA_TIME_S     1.0f
+#define AUDIO_WINDOW_MS 100U
+
+static uint16_t audio_buffer[AUDIO_BUFFER_WORDS];
+
+static I2S_HandleTypeDef *audio_i2s;
+
+static volatile uint32_t half_count = 0U;
+static volatile uint32_t full_count = 0U;
+static volatile uint32_t error_count = 0U;
+
+static volatile uint8_t ready_half = 0U;
+static volatile uint32_t missed_blocks = 0U;
+
+static float sample_sum = 0.0f;
+static float sample_square_sum = 0.0f;
+static uint32_t sample_count = 0U;
+
+static uint32_t audio_window_start_ms = 0U;
+static AudioStats latest_stats = {0};
+
+static float ema_power = 0.0f;
+static uint32_t ema_last_ms = 0U;
+static uint8_t ema_initialized = 0U;
+
+static int32_t Audio_Decode24(uint16_t high, uint16_t low){
+
+    // Join two 16-bit words into one 32-bit value.
+    uint32_t packed =
+        ((uint32_t)high << 16) | low;
+
+    // Provisional one-bit alignment correction observed during testing.
+    // Keep this until I2S timing is verified on the hardware.
+    packed <<= 1;
+
+    // Extract the 24-bit sample.
+    uint32_t raw24 = (packed >> 8) & 0xFFFFFFU;
+
+    // Convert unsigned 24-bit representation
+    // into a signed 32-bit integer.
+    return (int32_t)(raw24 ^ 0x800000U) - 0x800000;
+}
+
+HAL_StatusTypeDef Audio_Start(I2S_HandleTypeDef *hi2s)
+{
+    audio_i2s = hi2s;
+    audio_window_start_ms = HAL_GetTick();
+
+    return HAL_I2S_Receive_DMA(
+        hi2s,
+        audio_buffer,
+        (uint16_t)(AUDIO_BUFFER_WORDS / 2U)
+    );
+}
+
+void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s){
+    if (hi2s == audio_i2s)
+    {
+        half_count++;
+        if (ready_half != 0U){
+            missed_blocks++;
+        }
+        ready_half = 1U;
+
+    }
+}
+
+void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s)
+{
+    if (hi2s == audio_i2s)
+    {
+        full_count++;
+        if (ready_half != 0U){
+            missed_blocks++;
+        }
+        ready_half = 2U;
+    }
+}
+
+void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
+{
+    if (hi2s == audio_i2s)
+    {
+        error_count++;
+    }
+}
+
+void Audio_Update(uint32_t now_ms)
+{
+    uint32_t elapsed_ms =
+        (uint32_t)(now_ms - audio_window_start_ms);
+
+    if (elapsed_ms < AUDIO_WINDOW_MS)
+    {
+        return;
+    }
+
+    audio_window_start_ms = now_ms;
+
+    // Start with default results for this window.
+    latest_stats.processed_samples = sample_count;
+    latest_stats.rms = 0.0f;
+    latest_stats.dbfs = -120.0f;
+    latest_stats.estimated_level_db = 0.0f;
+
+    if (sample_count > 0U)
+    {
+        float n = (float)sample_count;
+
+        float mean = sample_sum / n;
+        float mean_square = sample_square_sum / n;
+
+        // Calculate the signal power without DC offset.
+        float power = mean_square - (mean * mean);
+
+        if (power > 0.0f)
+        {
+            latest_stats.rms = sqrtf(power);
+
+            if (latest_stats.rms >= 0.000001f)
+            {
+                latest_stats.dbfs =
+                    20.0f * log10f(latest_stats.rms);
+            }
+
+            // Update the EMA using the measured interval.
+            if (!ema_initialized)
+            {
+                ema_power = power;
+                ema_initialized = 1U;
+            }
+            else
+            {
+                float dt =
+                    (float)(uint32_t)(now_ms - ema_last_ms)
+                    / 1000.0f;
+
+                float alpha =
+                    1.0f - expf(-dt / AUDIO_EMA_TIME_S);
+
+                ema_power += alpha * (power - ema_power);
+            }
+
+            ema_last_ms = now_ms;
+
+            if (ema_power > 0.0f)
+            {
+                latest_stats.estimated_level_db =
+                    10.0f * log10f(ema_power)
+                    + AUDIO_CAL_OFFSET_DB;
+            }
+        }
+    }
+
+    // Reset accumulation for the next 100 ms window.
+    sample_sum = 0.0f;
+    sample_square_sum = 0.0f;
+    sample_count = 0U;
+}
+
+AudioStats Audio_GetStats(void)
+{
+    // Return the most recently completed window.
+    AudioStats stats = latest_stats;
+
+    // Add diagnostic counters updated by interrupts.
+    stats.half_count = half_count;
+    stats.full_count = full_count;
+    stats.error_count = error_count;
+    stats.missed_blocks = missed_blocks;
+
+    return stats;
+}
+
+void Audio_Process(void){
+    // Read and clear the ready flag without losing an IRQ notification.
+    // Restore the previous interrupt state instead of always enabling IRQs.
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    uint8_t half = ready_half;
+    ready_half = 0U;
+    __set_PRIMASK(primask);
+
+    if (half == 0U)
+    {
+        return;
+    }
+
+    uint32_t start = (half == 1U)
+        ? 0U
+        : AUDIO_BUFFER_WORDS / 2U;
+
+    uint32_t end = start + AUDIO_BUFFER_WORDS / 2U;
+
+    // Each stereo frame contains four 16-bit words.
+    for (uint32_t i = start; i < end; i += 4U)
+    {
+        // Left channel: words 0 and 1.
+        int32_t sample = Audio_Decode24(
+            audio_buffer[i],
+            audio_buffer[i + 1U]
+        );
+
+        // RMS calculation
+        // Normalize signed 24-bit audio to approximately -1.0 to +1.0.
+        float x = (float)sample / 8388608.0f;
+
+        sample_sum += x;
+        sample_square_sum += x * x;
+        sample_count++;
+    }
+}
+
+

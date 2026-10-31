@@ -69,6 +69,7 @@ cmake/host-tools/
 *.log
 .DS_Store
 Thumbs.db
+sleeplab.wav
 
 # Crash dumps (do NOT use *core*: CMSIS needs core_cm4.h!)
 /core.*

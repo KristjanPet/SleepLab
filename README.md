@@ -20,12 +20,14 @@ SleepLab is an embedded learning project that explores environmental measurement
 - [x] STM32 startup, clocks, GPIO and LED
 - [x] SHT3x I²C driver with CRC-8 validation and error reporting
 - [x] Non-blocking sensor conversion using a state machine
-- [x] Periodic measurements (1 second) using `HAL_GetTick()`
+- [x] Periodic environmental measurements (currently 500 ms) using `HAL_GetTick()`
 - [x] USB CDC temperature and humidity output
 - [x] Independent LED heartbeat and `WFI` (Wait For Interrupt) CPU sleep
 - [x] Timing experiments with DWT (Data Watchpoint and Trace) and TIM2 (Timer 2)
 - [ ] Additional environmental sensors
-- [ ] Microphone/audio acquisition with DMA (Direct Memory Access)
+- [x] INMP441 microphone acquisition using I²S2 and circular DMA (Direct Memory Access)
+- [x] 100 ms audio RMS/dBFS measurement, 1 s power EMA and experimental phone-referenced estimated level
+- [x] USB CDC telemetry and Python live monitor
 - [ ] SD card logging and sleep-environment analysis
 
 The TIM2 interrupt and DWT measurements were learning experiments. They are not required for normal sensor acquisition.
@@ -35,6 +37,8 @@ The TIM2 interrupt and DWT measurements were learning experiments. They are not 
 - `Core/Src/main.c` — CubeMX initialization and main loop
 - `Core/Src/app.c` — measurement scheduling, LED and USB output
 - `Core/Src/sht3x.c` — SHT3x sensor commands, data conversion and CRC checks
+- `Core/Src/audio.c` — I²S DMA sample acquisition, RMS, dBFS and level estimate
+- `tools/sleeplab_live_monitor.py` — PC telemetry plots and CSV export
 - `USB_DEVICE/` — CubeMX-generated USB CDC interface
 
 ## Building
@@ -46,8 +50,8 @@ cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-Flash the firmware with STM32CubeProgrammer using the board's USB DFU boot mode. In normal operation, open the USB CDC virtual COM port to read temperature and humidity data.
+Flash the firmware with STM32CubeProgrammer using the board's USB DFU boot mode. In normal operation, open the USB CDC virtual COM port to read temperature, humidity and audio statistics. `Est` is an experimental phone-referenced estimate, not a certified dBA SPL measurement.
 
 ## Status
 
-Early development. SHT3x measurement and USB output work on hardware. Audio capture, additional sensors and data logging are planned.
+Early development. SHT3x measurements and microphone acquisition have been demonstrated on hardware. Audio sample alignment remains provisional. Additional sensors, data logging and Zephyr learning exercises are planned.
