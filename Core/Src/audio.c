@@ -32,15 +32,14 @@ static float ema_power = 0.0f;
 static uint32_t ema_last_ms = 0U;
 static uint8_t ema_initialized = 0U;
 
-static volatile uint16_t debug_frame[4];
-
 static int32_t Audio_Decode24(uint16_t high, uint16_t low){
 
     // Join two 16-bit words into one 32-bit value.
     uint32_t packed =
         ((uint32_t)high << 16) | low;
 
-    // One-bit offset.
+    // Provisional one-bit alignment correction observed during testing.
+    // Keep this until I2S timing is verified on the hardware.
     packed <<= 1;
 
     // Extract the 24-bit sample.
@@ -72,12 +71,6 @@ void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s){
         }
         ready_half = 1U;
 
-        // DMA is now filling the second half.
-        // The first half is safe to read.
-        for (uint32_t i = 0; i < 4U; i++)
-        {
-            debug_frame[i] = audio_buffer[i];
-        }
     }
 }
 
@@ -185,21 +178,17 @@ AudioStats Audio_GetStats(void)
     stats.error_count = error_count;
     stats.missed_blocks = missed_blocks;
 
-    for (uint32_t i = 0; i < 4U; i++)
-    {
-        stats.raw_frame[i] = debug_frame[i];
-    }
-
     return stats;
 }
 
 void Audio_Process(void){
-    // Read and clear the ready flag atomically
-    // relative to the interrupt callbacks.
+    // Read and clear the ready flag without losing an IRQ notification.
+    // Restore the previous interrupt state instead of always enabling IRQs.
+    uint32_t primask = __get_PRIMASK();
     __disable_irq();
     uint8_t half = ready_half;
     ready_half = 0U;
-    __enable_irq();
+    __set_PRIMASK(primask);
 
     if (half == 0U)
     {
