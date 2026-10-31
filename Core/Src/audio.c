@@ -8,6 +8,7 @@
     (2U * AUDIO_FRAMES_PER_HALF * I2S_WORDS_PER_FRAME)
 #define AUDIO_CAL_OFFSET_DB 110.05f
 #define AUDIO_EMA_TIME_S     1.0f
+#define AUDIO_WINDOW_MS 100U
 
 static uint16_t audio_buffer[AUDIO_BUFFER_WORDS];
 
@@ -24,6 +25,9 @@ static float sample_sum = 0.0f;
 static float sample_square_sum = 0.0f;
 static uint32_t sample_count = 0U;
 
+static uint32_t audio_window_start_ms = 0U;
+static AudioStats latest_stats = {0};
+
 static float ema_power = 0.0f;
 static uint32_t ema_last_ms = 0U;
 static uint8_t ema_initialized = 0U;
@@ -36,7 +40,7 @@ static int32_t Audio_Decode24(uint16_t high, uint16_t low){
     uint32_t packed =
         ((uint32_t)high << 16) | low;
 
-    // Temporary test for the suspected one-bit offset.
+    // One-bit offset.
     packed <<= 1;
 
     // Extract the 24-bit sample.
@@ -50,6 +54,7 @@ static int32_t Audio_Decode24(uint16_t high, uint16_t low){
 HAL_StatusTypeDef Audio_Start(I2S_HandleTypeDef *hi2s)
 {
     audio_i2s = hi2s;
+    audio_window_start_ms = HAL_GetTick();
 
     return HAL_I2S_Receive_DMA(
         hi2s,
@@ -96,69 +101,94 @@ void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
     }
 }
 
-AudioStats Audio_GetStats(void){
-    AudioStats stats;
+void Audio_Update(uint32_t now_ms)
+{
+    uint32_t elapsed_ms =
+        (uint32_t)(now_ms - audio_window_start_ms);
 
-    stats.half_count = half_count;
-    stats.full_count = full_count;
-    stats.error_count = error_count;
-    stats.missed_blocks = missed_blocks;
-
-    for (uint32_t i = 0; i < 4U; i++){
-        stats.raw_frame[i] = debug_frame[i];
+    if (elapsed_ms < AUDIO_WINDOW_MS)
+    {
+        return;
     }
 
-    stats.processed_samples = sample_count;
-    stats.rms = 0.0f;
-    stats.dbfs = -120.0f; // Display floor when effectively silent.
+    audio_window_start_ms = now_ms;
 
-    if (sample_count > 0U){
+    // Start with default results for this window.
+    latest_stats.processed_samples = sample_count;
+    latest_stats.rms = 0.0f;
+    latest_stats.dbfs = -120.0f;
+    latest_stats.estimated_level_db = 0.0f;
+
+    if (sample_count > 0U)
+    {
         float n = (float)sample_count;
 
         float mean = sample_sum / n;
         float mean_square = sample_square_sum / n;
 
-        // Remove the DC component from the signal power.
-        float ac_power = mean_square - (mean * mean);
+        // Calculate the signal power without DC offset.
+        float power = mean_square - (mean * mean);
 
-        if (ac_power > 0.0f){
-            stats.rms = sqrtf(ac_power);
+        if (power > 0.0f)
+        {
+            latest_stats.rms = sqrtf(power);
 
-            if (stats.rms >= 0.000001f){
-                stats.dbfs = 20.0f * log10f(stats.rms);
+            if (latest_stats.rms >= 0.000001f)
+            {
+                latest_stats.dbfs =
+                    20.0f * log10f(latest_stats.rms);
+            }
+
+            // Update the EMA using the measured interval.
+            if (!ema_initialized)
+            {
+                ema_power = power;
+                ema_initialized = 1U;
+            }
+            else
+            {
+                float dt =
+                    (float)(uint32_t)(now_ms - ema_last_ms)
+                    / 1000.0f;
+
+                float alpha =
+                    1.0f - expf(-dt / AUDIO_EMA_TIME_S);
+
+                ema_power += alpha * (power - ema_power);
+            }
+
+            ema_last_ms = now_ms;
+
+            if (ema_power > 0.0f)
+            {
+                latest_stats.estimated_level_db =
+                    10.0f * log10f(ema_power)
+                    + AUDIO_CAL_OFFSET_DB;
             }
         }
     }
 
-    stats.estimated_level_db = 0.0f;
-
-    if (stats.processed_samples > 0U && stats.rms > 0.0f){
-        uint32_t now = HAL_GetTick();
-        float power = stats.rms * stats.rms;
-
-        if (!ema_initialized){
-            ema_power = power;
-            ema_initialized = 1U;
-        } 
-        else{
-            float dt = (float)(uint32_t)(now - ema_last_ms) / 1000.0f;
-
-            // Calculate alpha from the actual elapsed time.
-            float alpha = 1.0f - expf(-dt / AUDIO_EMA_TIME_S);
-
-            ema_power += alpha * (power - ema_power);
-        }
-
-        ema_last_ms = now;
-
-        stats.estimated_level_db =
-            10.0f * log10f(ema_power) + AUDIO_CAL_OFFSET_DB;
-    }
-
-    // Start a new measurement window.
+    // Reset accumulation for the next 100 ms window.
     sample_sum = 0.0f;
     sample_square_sum = 0.0f;
     sample_count = 0U;
+}
+
+AudioStats Audio_GetStats(void)
+{
+    // Return the most recently completed window.
+    AudioStats stats = latest_stats;
+
+    // Add diagnostic counters updated by interrupts.
+    stats.half_count = half_count;
+    stats.full_count = full_count;
+    stats.error_count = error_count;
+    stats.missed_blocks = missed_blocks;
+
+    for (uint32_t i = 0; i < 4U; i++)
+    {
+        stats.raw_frame[i] = debug_frame[i];
+    }
 
     return stats;
 }

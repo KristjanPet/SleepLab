@@ -116,6 +116,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
       Audio_Process();
+      Audio_Update(HAL_GetTick());
       App_Update();
       __WFI();
   }
